@@ -76,6 +76,28 @@ func createTodo(c *gin.Context) {
 	c.JSON(http.StatusCreated, newTodo)
 }
 
+// Retreieve todo by id
+func getTodoByID(c *gin.Context) {
+	id := c.Param("id")
+
+	sqlStatement := `
+	SELECT * FROM todo 
+	WHERE id = $1;`
+
+	var todo Todo
+	err := db.QueryRow(sqlStatement, id).Scan(&todo.ID, &todo.Title, &todo.Complete, &todo.LastUpdated)
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	log.Println("Found match for todo with given id")
+
+	// Returns todo based on id
+	c.JSON(http.StatusOK, todo)
+}
+
 // use godot package to load/read the .env file and
 // return the value of the key
 func goDotEnvVariable(key string) string {
@@ -120,8 +142,9 @@ func main() {
 	router := gin.Default()
 
 	// Register routes for CRUD operations
-	router.GET("/todos", getTodos)    // Get all todos
-	router.POST("/todos", createTodo) // Create a new todo
+	router.GET("/todos", getTodos)        // Get all todos
+	router.POST("/todos", createTodo)     // Create a new todo
+	router.GET("/todos/:id", getTodoByID) // Get a single todo by ID
 
 	router.Run("localhost:8080")
 }
