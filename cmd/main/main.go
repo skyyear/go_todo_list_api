@@ -23,9 +23,33 @@ type Todo struct {
 	LastUpdated time.Time `json:"last_updated"`
 }
 
-var todoList []Todo
-
+// Retrieves all Todos
 func getTodos(c *gin.Context) {
+
+	var todoList []Todo
+
+	sqlStatement := `SELECT * FROM todo`
+
+	rows, err := db.Query(sqlStatement)
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var todo Todo
+		err := rows.Scan(&todo.ID, &todo.Title, &todo.Complete, &todo.LastUpdated)
+		if err != nil {
+			log.Println(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		todoList = append(todoList, todo)
+	}
+
+	// Return Todos in Array
 	c.JSON(http.StatusOK, todoList)
 }
 
