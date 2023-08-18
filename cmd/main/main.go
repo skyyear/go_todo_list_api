@@ -98,6 +98,45 @@ func getTodoByID(c *gin.Context) {
 	c.JSON(http.StatusOK, todo)
 }
 
+// Update existing Todo by ID
+func updateTodoByID(c *gin.Context) {
+	id := c.Param("id")
+
+	var updatedTodo Todo
+	if err := c.ShouldBindJSON(&updatedTodo); err != nil {
+		log.Println(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	sqlStatement := `
+        UPDATE todo
+        SET title = $1, complete = $2
+        WHERE id = $3`
+
+	res, err := db.Exec(sqlStatement, updatedTodo.Title, updatedTodo.Complete, id)
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if rows == 0 {
+		// Send a not found response with an error message saying the given id doesn't exist
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("todo with id %s does not exist", id)})
+	} else {
+		// Send a JSON message response with the number of affected rows
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d row(s) updated", rows)})
+	}
+}
+
 // use godot package to load/read the .env file and
 // return the value of the key
 func goDotEnvVariable(key string) string {
@@ -142,9 +181,10 @@ func main() {
 	router := gin.Default()
 
 	// Register routes for CRUD operations
-	router.GET("/todos", getTodos)        // Get all todos
-	router.POST("/todos", createTodo)     // Create a new todo
-	router.GET("/todos/:id", getTodoByID) // Get a single todo by ID
+	router.GET("/todos", getTodos)           // Get all todos
+	router.POST("/todos", createTodo)        // Create a new todo
+	router.GET("/todos/:id", getTodoByID)    // Get a single todo by ID
+	router.PUT("/todos/:id", updateTodoByID) // Update a todo by ID
 
 	router.Run("localhost:8080")
 }
