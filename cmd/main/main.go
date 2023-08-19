@@ -137,6 +137,36 @@ func updateTodoByID(c *gin.Context) {
 	}
 }
 
+// Delete todo by ID
+func deleteTodoByID(c *gin.Context) {
+	id := c.Param("id")
+
+	sqlStatement := `
+        DELETE FROM todo
+        WHERE id = $1`
+
+	res, err := db.Exec(sqlStatement, id)
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if rows == 0 {
+		// Send a not found response with an error message
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("todo with id %s does not exist", id)})
+	} else {
+		// Send a success response with a message
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d row(s) deleted", rows)})
+	}
+}
+
 // use godot package to load/read the .env file and
 // return the value of the key
 func goDotEnvVariable(key string) string {
@@ -181,10 +211,11 @@ func main() {
 	router := gin.Default()
 
 	// Register routes for CRUD operations
-	router.GET("/todos", getTodos)           // Get all todos
-	router.POST("/todos", createTodo)        // Create a new todo
-	router.GET("/todos/:id", getTodoByID)    // Get a single todo by ID
-	router.PUT("/todos/:id", updateTodoByID) // Update a todo by ID
+	router.GET("/todos", getTodos)              // Get all todos
+	router.POST("/todos", createTodo)           // Create a new todo
+	router.GET("/todos/:id", getTodoByID)       // Get a single todo by ID
+	router.PUT("/todos/:id", updateTodoByID)    // Update a todo by ID
+	router.DELETE("/todos/:id", deleteTodoByID) // Delete a todo by ID
 
 	router.Run("localhost:8080")
 }
