@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -90,6 +91,10 @@ func getTodoByID(c *gin.Context) {
 	var todo Todo
 	err := db.QueryRow(sqlStatement, id).Scan(&todo.ID, &todo.Title, &todo.Complete, &todo.LastUpdated)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"message": fmt.Sprintf("Todo with id %s not found", id)})
+			return
+		}
 		log.Println(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
