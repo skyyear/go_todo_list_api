@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -57,9 +58,10 @@ func getTodos(c *gin.Context) {
 func createTodo(c *gin.Context) {
 
 	sqlStatement := `
-    INSERT INTO todo (title, complete)
-    VALUES ($1, $2)
-    RETURNING id, last_updated;`
+		INSERT INTO todo (title, complete)
+		VALUES ($1, $2)
+		RETURNING id, last_updated;
+	`
 
 	var newTodo Todo
 	if err := c.ShouldBindJSON(&newTodo); err != nil {
@@ -81,8 +83,9 @@ func getTodoByID(c *gin.Context) {
 	id := c.Param("id")
 
 	sqlStatement := `
-	SELECT * FROM todo 
-	WHERE id = $1;`
+		SELECT * FROM todo 
+		WHERE id = $1;
+	`
 
 	var todo Todo
 	err := db.QueryRow(sqlStatement, id).Scan(&todo.ID, &todo.Title, &todo.Complete, &todo.LastUpdated)
@@ -167,6 +170,68 @@ func deleteTodoByID(c *gin.Context) {
 	}
 }
 
+// Delete multiple todos by ids
+func deleteTodosByIDs(c *gin.Context) {
+	var ids []int
+	err := c.BindJSON(&ids)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Convert the list of ids to a comma-separated string
+	idStr := strings.Trim(strings.Join(strings.Fields(fmt.Sprint(ids)), ","), "[]")
+
+	sqlStatement := `
+		DELETE FROM todo 
+		WHERE id IN (%s) 
+		RETURNING id;
+	`
+
+	sql := fmt.Sprintf(sqlStatement, idStr)
+
+	rows, err := db.Query(sql)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var deleted []int
+	for rows.Next() {
+		var id int
+		err := rows.Scan(&id)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		deleted = append(deleted, id)
+	}
+
+	rowsAffected := len(deleted)
+
+	// Find the difference between the original and deleted ids
+	var notFound []int
+	for _, id := range ids {
+		if !contains(deleted, id) {
+			notFound = append(notFound, id)
+		}
+	}
+
+	// Return a success message with the number of rows deleted and which ids were not found
+	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d todos deleted", rowsAffected), "ids_not_found": notFound})
+}
+
+// Helper function to check if a slice contains an element
+func contains(s []int, e int) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
 // use godot package to load/read the .env file and
 // return the value of the key
 func goDotEnvVariable(key string) string {
@@ -216,6 +281,7 @@ func main() {
 	router.GET("/todos/:id", getTodoByID)       // Get a single todo by ID
 	router.PUT("/todos/:id", updateTodoByID)    // Update a todo by ID
 	router.DELETE("/todos/:id", deleteTodoByID) // Delete a todo by ID
+	router.DELETE("/todos", deleteTodosByIDs)   // Delete multiple todos by ids
 
 	router.Run("localhost:8080")
 }
