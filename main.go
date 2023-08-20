@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
@@ -237,44 +236,34 @@ func contains(s []int, e int) bool {
 	return false
 }
 
-// use godot package to load/read the .env file and
-// return the value of the key
-func goDotEnvVariable(key string) string {
-
-	// load .env file
-	err := godotenv.Load(".env")
-
-	if err != nil {
-		log.Fatalf("Error loading .env file")
-	}
-
-	return os.Getenv(key)
-}
-
 // Initialize database connection in main function
 func main() {
 
-	host := goDotEnvVariable("HOST")
-	port := 2022
-	user := goDotEnvVariable("DB_USER")
-	password := goDotEnvVariable("DB_PASSWORD")
-	dbname := goDotEnvVariable("DB_NAME")
+	host := os.Getenv("DB_HOST")
+	port := os.Getenv("DB_PORT")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbname := os.Getenv("DB_NAME")
 
 	// create connection string
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
+	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
+
+	fmt.Println(psqlInfo)
 
 	// Open database connection
 	var err error
 	db, err = sql.Open("postgres", psqlInfo)
 	if err != nil {
+		log.Fatal("Failed to open connection to Postgres")
 		log.Fatal(err)
 	}
 
 	// Test database connection
 	err = db.Ping()
 	if err != nil {
+		log.Fatal("Failed test connection to Postgres")
 		log.Fatal(err)
 	}
 
@@ -288,5 +277,5 @@ func main() {
 	router.DELETE("/todos/:id", deleteTodoByID) // Delete a todo by ID
 	router.DELETE("/todos", deleteTodosByIDs)   // Delete multiple todos by ids
 
-	router.Run("localhost:8080")
+	router.Run("0.0.0.0:8080")
 }
